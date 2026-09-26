@@ -6,8 +6,7 @@ import {
 
 import {
   saveGameState,
-  createInitialState,
-  loadGameState
+  createInitialState
 } from './state.js';
 
 import {
@@ -15,21 +14,30 @@ import {
   getLocationData
 } from '../world/world.js';
 
-import { Player } from '../player/player.js';
+import {
+  Player
+} from '../player/player.js';
 
-import { createHUD } from '../ui/hud.js';
+import {
+  createHUD
+} from '../ui/hud.js';
 
-import { createDialoguePanel } from '../ui/dialogueUI.js';
+import {
+  createDialoguePanel
+} from '../ui/dialogueUI.js';
 
 import {
   createTitleScreen,
   createSettingsPanel
 } from '../ui/menus.js';
 
-import { AudioManager } from '../audio/audioManager.js';
+import {
+  AudioManager
+} from '../audio/audioManager.js';
 
 
 export function createGame(root) {
+
   const game = {
     root,
 
@@ -83,60 +91,38 @@ export function createGame(root) {
 
   game.world = createWorld();
 
-  game.player = new Player(190, 220);
 
-  game.hud = createHUD(root, game);
+  game.player = new Player(
+    game.state.player.x,
+    game.state.player.y
+  );
 
-  game.dialogue = createDialoguePanel(root, game);
+
+  game.hud = createHUD(
+    root,
+    game
+  );
+
+
+  game.dialogue = createDialoguePanel(
+    root,
+    game
+  );
+
 
   game.audio = new AudioManager();
 
 
-  game.titleScreen = createTitleScreen(root, game);
-
-  game.settingsPanel = createSettingsPanel(root, game);
-
-
-  /*
-   * Try to load an existing save.
-   * If there is no save, use the initial state.
-   */
-  const savedState = loadGameState();
-
-  if (savedState) {
-    game.state = mergeState(
-      createInitialState(),
-      savedState
-    );
-  }
+  game.titleScreen = createTitleScreen(
+    root,
+    game
+  );
 
 
-  /*
-   * Make sure older saves that do not have
-   * the new progress object still work.
-   */
-  if (!game.state.progress) {
-    game.state.progress = {
-      recorderFound: false,
-      currentMemory: 0
-    };
-  }
-
-
-  /*
-   * Keep player position synchronized with saved state.
-   */
-  if (
-    game.state.player &&
-    typeof game.state.player.x === 'number' &&
-    typeof game.state.player.y === 'number'
-  ) {
-    game.player.x = game.state.player.x;
-    game.player.y = game.state.player.y;
-  }
-
-
-  updateObjective.call(game);
+  game.settingsPanel = createSettingsPanel(
+    root,
+    game
+  );
 
 
   game.hud.updateMemoryText(
@@ -145,7 +131,10 @@ export function createGame(root) {
   );
 
 
-  game.hud.updatePrompt('');
+  game.hud.updateObjective(
+    game.state.objective ||
+    'Find the Memory Recorder.'
+  );
 
 
   game.scene = 'title';
@@ -166,62 +155,32 @@ export function createGame(root) {
 
 
 /*
- * Safely merge saved data with the newest state structure.
+ * =========================================================
+ * GAME LOOP
+ * =========================================================
  */
-function mergeState(defaultState, savedState) {
-  return {
-    ...defaultState,
-    ...savedState,
-
-    flags: {
-      ...defaultState.flags,
-      ...(savedState.flags || {})
-    },
-
-    settings: {
-      ...defaultState.settings,
-      ...(savedState.settings || {})
-    },
-
-    player: {
-      ...defaultState.player,
-      ...(savedState.player || {})
-    },
-
-    memoryLocations: {
-      ...defaultState.memoryLocations,
-      ...(savedState.memoryLocations || {})
-    },
-
-    progress: {
-      ...defaultState.progress,
-      ...(savedState.progress || {})
-    }
-  };
-}
-
 
 function gameLoop(time) {
-  const dt = Math.min(
-    (time - this.lastTime) / 1000 || 0.016,
-    0.033
-  );
+
+  const dt =
+    Math.min(
+      (time - this.lastTime) / 1000 || 0.016,
+      0.033
+    );
+
 
   this.lastTime = time;
 
 
   /*
-   * =========================
-   * UPDATE
-   * =========================
+   * GAMEPLAY
    */
 
   if (this.scene === 'playing') {
 
-    /*
-     * Player movement
-     */
-    const movement = getMovementVector();
+    const movement =
+      getMovementVector();
+
 
     this.player.update(
       dt,
@@ -232,37 +191,17 @@ function gameLoop(time) {
     );
 
 
-    /*
-     * Memory Echo timer
-     */
-    if (this.state.echoTimer > 0) {
+    this.state.player.x =
+      this.player.x;
 
-      this.state.echoTimer -= dt;
-
-      if (this.state.echoTimer <= 0) {
-
-        this.state.echoTimer = 0;
-
-        this.state.activeEcho = null;
-
-        this.state.echoMessage = '';
-
-        this.state.echoLocation = null;
-      }
-    }
+    this.state.player.y =
+      this.player.y;
 
 
     /*
-     * Save player position
+     * Camera
      */
-    this.state.player.x = this.player.x;
 
-    this.state.player.y = this.player.y;
-
-
-    /*
-     * Camera follows player
-     */
     this.camera.x =
       this.player.x -
       this.canvas.width / 2;
@@ -273,58 +212,24 @@ function gameLoop(time) {
 
 
     /*
-     * Find nearest interactable
+     * Find closest interaction
      */
-    const location = getLocationData(
-      this.state.currentLocation
-    );
+
+    const location =
+      getLocationData(
+        this.state.currentLocation
+      );
 
 
     let closest = null;
 
-    let closestDistance = Infinity;
+    let closestDistance =
+      Infinity;
 
 
-    for (const object of location.interactables) {
-
-      /*
-       * Do not show collected memories.
-       */
-      if (
-        object.id.startsWith('memory') &&
-        object.id !== 'memoryRecorder' &&
-        this.state.memoryLocations[object.id]
-      ) {
-        continue;
-      }
-
-
-      /*
-       * Only allow the correct memory in the story order.
-       */
-      if (
-        object.id === 'memory1' &&
-        !canInteractWithMemory.call(this, 1)
-      ) {
-        continue;
-      }
-
-
-      if (
-        object.id === 'memory2' &&
-        !canInteractWithMemory.call(this, 2)
-      ) {
-        continue;
-      }
-
-
-      if (
-        object.id === 'memory3' &&
-        !canInteractWithMemory.call(this, 3)
-      ) {
-        continue;
-      }
-
+    for (
+      const object of location.interactables
+    ) {
 
       const dx =
         this.player.x - object.x;
@@ -332,48 +237,39 @@ function gameLoop(time) {
       const dy =
         this.player.y - object.y;
 
-
       const distance =
         Math.hypot(dx, dy);
 
 
       if (
         distance <
-          object.radius + 32 &&
+          object.radius + 35 &&
         distance <
           closestDistance
       ) {
 
         closest = object;
 
-        closestDistance = distance;
+        closestDistance =
+          distance;
       }
     }
 
 
-    this.currentInteraction = closest;
+    this.currentInteraction =
+      closest;
+
+
+    this.interactionPrompt =
+      closest
+        ? '[E] INTERACT'
+        : '';
 
 
     /*
-     * Interaction prompt
+     * E = interact
      */
-    if (closest) {
 
-      this.interactionPrompt =
-        getInteractionPrompt.call(
-          this,
-          closest
-        );
-
-    } else {
-
-      this.interactionPrompt = '';
-    }
-
-
-    /*
-     * E key
-     */
     if (
       consumePressed('e') &&
       this.currentInteraction
@@ -384,61 +280,64 @@ function gameLoop(time) {
 
 
     /*
-     * Escape
+     * ESC = title
      */
-    if (consumePressed('escape')) {
+
+    if (
+      consumePressed('escape')
+    ) {
 
       this.scene = 'title';
 
-      this.titleScreen.show();
-
       this.dialogue.hide();
 
-      this.currentInteraction = null;
+      this.titleScreen.show();
     }
 
 
     /*
      * HUD
      */
+
     this.hud.updateMemoryText(
       this.state.memories.length,
       3
     );
 
+
     this.hud.updateObjective(
       this.state.objective
     );
+
 
     this.hud.updatePrompt(
       this.interactionPrompt
     );
 
 
-    /*
-     * Save
-     */
-    saveGameState(this.state);
+    saveGameState(
+      this.state
+    );
   }
 
 
   /*
-   * =========================
+   * =========================================================
    * DRAW
-   * =========================
+   * =========================================================
    */
 
   const ctx = this.ctx;
 
-  const width = this.canvas.width;
+  const width =
+    this.canvas.width;
 
-  const height = this.canvas.height;
+  const height =
+    this.canvas.height;
 
 
-  /*
-   * Base background
-   */
-  ctx.fillStyle = '#0d1118';
+  ctx.fillStyle =
+    '#0d1118';
 
   ctx.fillRect(
     0,
@@ -454,15 +353,20 @@ function gameLoop(time) {
     );
 
 
-  const cameraX = this.camera.x;
+  const cameraX =
+    this.camera.x;
 
-  const cameraY = this.camera.y;
+  const cameraY =
+    this.camera.y;
 
 
   /*
    * World background
    */
-  ctx.fillStyle = location.bg;
+
+  ctx.fillStyle =
+    location.bg;
+
 
   ctx.fillRect(
     -cameraX,
@@ -475,6 +379,7 @@ function gameLoop(time) {
   /*
    * Grid
    */
+
   ctx.strokeStyle =
     'rgba(255,255,255,0.08)';
 
@@ -526,16 +431,19 @@ function gameLoop(time) {
 
 
   /*
-   * Colliders
+   * Obstacles
    */
+
   for (
-    const collider of this.world.getColliders(
-      this.state.currentLocation
-    )
+    const collider of
+      this.world.getColliders(
+        this.state.currentLocation
+      )
   ) {
 
     ctx.fillStyle =
       'rgba(255,255,255,0.06)';
+
 
     ctx.fillRect(
       collider.x - cameraX,
@@ -549,18 +457,24 @@ function gameLoop(time) {
   /*
    * Interactable objects
    */
+
   for (
-    const object of location.interactables
+    const object of
+      location.interactables
   ) {
 
     /*
-     * Don't draw collected memories.
+     * Don't show already-collected
+     * memory objects.
      */
+
     if (
       object.id.startsWith('memory') &&
-      object.id !== 'memoryRecorder' &&
-      this.state.memoryLocations[object.id]
+      this.state.memoryLocations[
+        object.id
+      ]
     ) {
+
       continue;
     }
 
@@ -573,36 +487,49 @@ function gameLoop(time) {
 
 
     /*
-     * Memory Recorder visual
+     * Memory objects
      */
-    if (
-      object.id === 'memoryRecorder'
-    ) {
 
-      const pulse =
-        1 +
-        Math.sin(
-          performance.now() / 350
-        ) *
-        0.12;
+    const isMemory =
+      object.id === 'memory1' ||
+      object.id === 'memory2' ||
+      object.id === 'memory3';
 
 
-      ctx.fillStyle =
-        object.color || '#8ed9d4';
+    /*
+     * Recorder
+     */
+
+    const isRecorder =
+      object.id === 'memoryRecorder';
 
 
-      ctx.beginPath();
+    /*
+     * Normal object
+     */
 
-      ctx.arc(
-        drawX,
-        drawY,
-        object.radius * pulse,
-        0,
-        Math.PI * 2
-      );
+    ctx.fillStyle =
+      object.color || '#9eb7ff';
 
-      ctx.fill();
 
+    ctx.beginPath();
+
+    ctx.arc(
+      drawX,
+      drawY,
+      object.radius,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+
+
+    /*
+     * Glow for recorder
+     */
+
+    if (isRecorder) {
 
       ctx.strokeStyle =
         'rgba(142,217,212,0.55)';
@@ -621,14 +548,27 @@ function gameLoop(time) {
       );
 
       ctx.stroke();
+    }
 
-    } else {
 
-      /*
-       * Normal interactable
-       */
-      ctx.fillStyle =
-        object.color || '#9eb7ff';
+    /*
+     * Glow for memories
+     */
+
+    if (isMemory) {
+
+      const pulse =
+        1 +
+        Math.sin(
+          performance.now() / 300
+        ) *
+        0.15;
+
+
+      ctx.strokeStyle =
+        'rgba(168,255,208,0.45)';
+
+      ctx.lineWidth = 2;
 
 
       ctx.beginPath();
@@ -636,62 +576,28 @@ function gameLoop(time) {
       ctx.arc(
         drawX,
         drawY,
-        object.radius,
+        (object.radius + 12) *
+          pulse,
         0,
         Math.PI * 2
       );
 
-      ctx.fill();
-
-
-      /*
-       * Memory pulse
-       */
-      if (
-        object.id === 'memory1' ||
-        object.id === 'memory2' ||
-        object.id === 'memory3'
-      ) {
-
-        const pulse =
-          1 +
-          Math.sin(
-            performance.now() / 300
-          ) *
-          0.15;
-
-
-        ctx.strokeStyle =
-          'rgba(168,255,208,0.45)';
-
-        ctx.lineWidth = 2;
-
-
-        ctx.beginPath();
-
-        ctx.arc(
-          drawX,
-          drawY,
-          (object.radius + 12) * pulse,
-          0,
-          Math.PI * 2
-        );
-
-        ctx.stroke();
-      }
+      ctx.stroke();
     }
 
 
     /*
-     * Highlight nearby object
+     * Current interaction highlight
      */
+
     if (
       this.currentInteraction &&
-      this.currentInteraction.id === object.id
+      this.currentInteraction.id ===
+        object.id
     ) {
 
       ctx.strokeStyle =
-        'rgba(255,255,255,0.85)';
+        'rgba(255,255,255,0.9)';
 
       ctx.lineWidth = 2;
 
@@ -714,6 +620,7 @@ function gameLoop(time) {
   /*
    * Player
    */
+
   this.player.draw(
     ctx,
     cameraX,
@@ -722,18 +629,12 @@ function gameLoop(time) {
 
 
   /*
-   * Memory Echo
-   */
-  drawMemoryEcho.call(
-    this,
-    ctx
-  );
-
-
-  /*
    * Title overlay
    */
-  if (this.scene === 'title') {
+
+  if (
+    this.scene === 'title'
+  ) {
 
     ctx.fillStyle =
       'rgba(0,0,0,0.35)';
@@ -754,70 +655,17 @@ function gameLoop(time) {
 
 
 /*
- * =========================
- * INTERACTION PROMPTS
- * =========================
- */
-
-function getInteractionPrompt(object) {
-
-  if (
-    object.id === 'memoryRecorder'
-  ) {
-
-    return 'MEMORY RECORDER  |  [E] INTERACT';
-  }
-
-
-  if (
-    object.id === 'memory1'
-  ) {
-
-    return 'MEMORY 1  |  [E] RECOVER MEMORY';
-  }
-
-
-  if (
-    object.id === 'memory2'
-  ) {
-
-    return 'MEMORY 2  |  [E] RECOVER MEMORY';
-  }
-
-
-  if (
-    object.id === 'memory3'
-  ) {
-
-    return 'MEMORY 3  |  [E] RECOVER MEMORY';
-  }
-
-
-  if (object.id === 'bed') {
-
-    return '[E] INTERACT';
-  }
-
-
-  if (object.id === 'window') {
-
-    return '[E] INTERACT';
-  }
-
-
-  return '[E] INTERACT';
-}
-
-
-/*
- * =========================
- * INTERACTION LOGIC
- * =========================
+ * =========================================================
+ * INTERACTION SYSTEM
+ * =========================================================
  */
 
 function triggerInteraction() {
 
-  if (!this.currentInteraction) {
+  if (
+    !this.currentInteraction
+  ) {
+
     return;
   }
 
@@ -826,23 +674,49 @@ function triggerInteraction() {
     this.currentInteraction.id;
 
 
-  this.audio.playSfx(
-    'interaction'
-  );
-
-
   /*
    * MEMORY RECORDER
    */
+
   if (
     id === 'memoryRecorder'
   ) {
 
-    activateRecorder.call(
-      this
-    );
+    /*
+     * Recorder can only be used
+     * before the memories begin.
+     */
 
-    this.currentInteraction = null;
+    if (
+      this.state.memories.length === 0
+    ) {
+
+      this.state.objective =
+        'Find Memory 1.';
+
+
+      this.hud.updateObjective(
+        'Find Memory 1.'
+      );
+
+
+      this.dialogue.show(
+        'MEMORY RECORDER',
+        'The machine hums.\n\nSomething inside is waiting for you.'
+      );
+
+    } else {
+
+      this.dialogue.show(
+        'MEMORY RECORDER',
+        'The recorder is silent now. It has already given you what it remembers.'
+      );
+    }
+
+
+    this.currentInteraction =
+      null;
+
 
     return;
   }
@@ -851,14 +725,28 @@ function triggerInteraction() {
   /*
    * MEMORY 1
    */
-  if (id === 'memory1') {
+
+  if (
+    id === 'memory1'
+  ) {
+
+    /*
+     * Memory 1 must be collected first.
+     */
+
+    if (
+      this.state.memories.length !== 0
+    ) {
+
+      return;
+    }
+
 
     collectMemory.call(
       this,
       'memory1'
     );
 
-    this.currentInteraction = null;
 
     return;
   }
@@ -867,14 +755,44 @@ function triggerInteraction() {
   /*
    * MEMORY 2
    */
-  if (id === 'memory2') {
+
+  if (
+    id === 'memory2'
+  ) {
+
+    /*
+     * Must have Memory 1.
+     */
+
+    if (
+      !this.state.memoryLocations.memory1
+    ) {
+
+      this.dialogue.show(
+        'MEMORY 2',
+        'The memory is still locked.\n\nSomething else must be remembered first.'
+      );
+
+      this.currentInteraction =
+        null;
+
+      return;
+    }
+
+
+    if (
+      this.state.memoryLocations.memory2
+    ) {
+
+      return;
+    }
+
 
     collectMemory.call(
       this,
       'memory2'
     );
 
-    this.currentInteraction = null;
 
     return;
   }
@@ -883,176 +801,120 @@ function triggerInteraction() {
   /*
    * MEMORY 3
    */
-  if (id === 'memory3') {
+
+  if (
+    id === 'memory3'
+  ) {
+
+    /*
+     * Must have Memory 1 and 2.
+     */
+
+    if (
+      !this.state.memoryLocations.memory1 ||
+      !this.state.memoryLocations.memory2
+    ) {
+
+      this.dialogue.show(
+        'MEMORY 3',
+        'The memory refuses to surface.\n\nYou are missing something.'
+      );
+
+      this.currentInteraction =
+        null;
+
+      return;
+    }
+
+
+    if (
+      this.state.memoryLocations.memory3
+    ) {
+
+      return;
+    }
+
 
     collectMemory.call(
       this,
       'memory3'
     );
 
-    this.currentInteraction = null;
 
     return;
   }
 
 
   /*
-   * Bed
+   * BED
    */
-  if (id === 'bed') {
+
+  if (
+    id === 'bed'
+  ) {
 
     this.dialogue.show(
       'MAYA',
       'The sheets still smell like rain. You were here before.'
     );
 
-    this.currentInteraction = null;
+
+    this.currentInteraction =
+      null;
+
 
     return;
   }
 
 
   /*
-   * Window
+   * WINDOW
    */
-  if (id === 'window') {
+
+  if (
+    id === 'window'
+  ) {
 
     this.dialogue.show(
       'CITY',
       'Rain marks the glass like a memory.'
     );
 
-    this.currentInteraction = null;
+
+    this.currentInteraction =
+      null;
+
 
     return;
   }
 
 
   /*
-   * Default
+   * DEFAULT
    */
+
   this.dialogue.show(
     'SILENCE',
     'Something feels unfinished here.'
   );
 
-  this.currentInteraction = null;
+
+  this.currentInteraction =
+    null;
 }
 
 
 /*
- * =========================
- * MEMORY RECORDER
- * =========================
- */
-
-function activateRecorder() {
-
-  if (
-    this.state.progress.recorderFound
-  ) {
-
-    return;
-  }
-
-
-  this.state.progress.recorderFound =
-    true;
-
-
-  this.state.progress.currentMemory =
-    1;
-
-
-  this.state.objective =
-    'Find Memory 1.';
-
-
-  this.dialogue.show(
-    'MEMORY RECORDER',
-    'The recorder hums.\nSomething inside it remembers you.'
-  );
-
-
-  saveGameState(
-    this.state
-  );
-
-
-  this.audio.playSfx(
-    'interaction'
-  );
-}
-
-
-/*
- * =========================
- * MEMORY ORDER
- * =========================
- */
-
-function canInteractWithMemory(number) {
-
-  if (
-    !this.state.progress.recorderFound
-  ) {
-
-    return false;
-  }
-
-
-  if (
-    this.state.progress.currentMemory !==
-    number
-  ) {
-
-    return false;
-  }
-
-
-  return true;
-}
-
-
-/*
- * =========================
- * COLLECT MEMORY
- * =========================
+ * =========================================================
+ * MEMORY COLLECTION
+ * =========================================================
  */
 
 function collectMemory(id) {
 
   /*
-   * Determine memory number
+   * Never collect twice.
    */
-  const number =
-    Number(
-      id.replace(
-        'memory',
-        ''
-      )
-    );
-
-
-  /*
-   * Safety checks
-   */
-  if (
-    !this.state.progress.recorderFound
-  ) {
-
-    return;
-  }
-
-
-  if (
-    this.state.progress.currentMemory !==
-    number
-  ) {
-
-    return;
-  }
-
 
   if (
     this.state.memoryLocations[id]
@@ -1065,26 +927,30 @@ function collectMemory(id) {
   const messages = {
 
     memory1:
-      'I remember standing at the entrance of this city.\n\nBut I don\'t remember coming here.\n\nI was not alone.',
+      'I remember standing at the entrance of this city.\n\nBut I don’t remember coming here.\n\nI was not alone.',
 
     memory2:
-      'Someone was with me.\n\nI remember their voice.\n\nBut I can\'t remember their face.\n\nThey told me not to trust the city.',
+      'Someone was with me.\n\nI remember their voice.\n\nBut I can’t remember their face.\n\nThey told me not to trust the city.',
 
     memory3:
-      'Now I remember.\n\nI wasn\'t searching for the city.\n\nThe city was searching for me.'
+      'Now I remember.\n\nI wasn’t searching for the city.\n\nThe city was searching for me.'
   };
 
 
   /*
-   * Mark memory as discovered
+   * Mark memory as collected FIRST.
+   *
+   * This is important.
    */
+
   this.state.memoryLocations[id] =
     true;
 
 
   /*
-   * Add to memories array
+   * Add to memory array.
    */
+
   if (
     !this.state.memories.includes(id)
   ) {
@@ -1094,708 +960,222 @@ function collectMemory(id) {
 
 
   /*
-   * Update progression
+   * Calculate the ACTUAL count.
    */
-  if (number < 3) {
 
-    this.state.progress.currentMemory =
-      number + 1;
-
-  } else {
-
-    this.state.progress.currentMemory =
-      4;
-  }
+  const count =
+    this.state.memories.length;
 
 
   /*
-   * Update objective
+   * Update HUD BEFORE opening dialogue.
    */
-  updateObjective.call(
-    this
-  );
 
-
-  /*
-   * Store echo
-   */
-  this.state.activeEcho = id;
-
-  this.state.echoMessage =
-    messages[id] ||
-    'Something returns to your memory.';
-
-  this.state.echoTimer = 6;
-
-  this.state.echoLocation =
-    this.state.currentLocation;
-
-
-  /*
-   * Update HUD
-   */
   this.hud.updateMemoryText(
-    this.state.memories.length,
+    count,
     3
   );
 
 
   /*
-   * Show the proper memory dialogue
+   * Decide next objective.
    */
-  this.scene = 'memory';
 
+  if (id === 'memory1') {
+
+    this.state.objective =
+      'Find Memory 2.';
+  }
+
+
+  if (id === 'memory2') {
+
+    this.state.objective =
+      'Find Memory 3.';
+  }
+
+
+  if (id === 'memory3') {
+
+    this.state.objective =
+      'Remember.';
+  }
+
+
+  this.hud.updateObjective(
+    this.state.objective
+  );
+
+
+  /*
+   * Save the correct state.
+   */
+
+  saveGameState(
+    this.state
+  );
+
+
+  /*
+   * Show the memory dialogue
+   * ONLY AFTER the state is updated.
+   */
 
   this.dialogue.show(
-    `MEMORY ${number}`,
+    id === 'memory1'
+      ? 'MEMORY 1'
+      : id === 'memory2'
+        ? 'MEMORY 2'
+        : 'MEMORY 3',
+
     messages[id]
   );
 
 
-  /*
-   * Try to attach a Continue handler
-   * to the existing dialogue panel.
-   */
-  attachContinueHandler.call(
-    this,
-    number
-  );
-
-
-  saveGameState(
-    this.state
-  );
-
-
-  this.audio.playSfx(
-    'interaction'
-  );
+  this.currentInteraction =
+    null;
 }
 
 
 /*
- * =========================
- * CONTINUE BUTTON
- * =========================
+ * =========================================================
+ * CALLED BY DIALOGUE UI
+ * =========================================================
  */
 
-function attachContinueHandler(memoryNumber) {
+export function continueAfterMemory(
+  game,
+  memoryNumber
+) {
 
   /*
-   * The existing dialogue UI is responsible
-   * for displaying the dialogue.
-   *
-   * We listen for a click on a button if
-   * the dialogue UI provides one.
+   * MEMORY 1
    */
-  const root =
-    this.root;
 
+  if (
+    memoryNumber === 1
+  ) {
 
-  const buttons =
-    root.querySelectorAll(
-      'button'
+    game.scene = 'playing';
+
+    game.state.objective =
+      'Find Memory 2.';
+
+    game.hud.updateMemoryText(
+      game.state.memories.length,
+      3
     );
 
+    game.hud.updateObjective(
+      'Find Memory 2.'
+    );
 
-  for (
-    const button of buttons
-  ) {
+    game.dialogue.hide();
 
-    const text =
-      button.textContent
-        .trim()
-        .toLowerCase();
+    saveGameState(
+      game.state
+    );
 
-
-    if (
-      text === 'continue' ||
-      text === 'close' ||
-      text === 'ok'
-    ) {
-
-      /*
-       * Avoid duplicate listeners.
-       */
-      if (
-        button.dataset.remnantBound ===
-        'true'
-      ) {
-
-        continue;
-      }
-
-
-      button.dataset.remnantBound =
-        'true';
-
-
-      button.addEventListener(
-        'click',
-        () => {
-
-          continueAfterMemory.call(
-            this,
-            memoryNumber
-          );
-
-        },
-        {
-          once: true
-        }
-      );
-    }
+    return;
   }
 
 
   /*
-   * Fallback:
-   * If the existing dialogue panel does not
-   * have a button, clicking the dialogue area
-   * can continue the game.
+   * MEMORY 2
    */
+
   if (
-    buttons.length === 0
+    memoryNumber === 2
   ) {
 
-    const dialogueElement =
-      root.querySelector(
-        '[data-dialogue], .dialogue, .dialogue-panel'
-      );
+    game.scene = 'playing';
 
+    game.state.objective =
+      'Find Memory 3.';
 
-    if (dialogueElement) {
+    game.hud.updateMemoryText(
+      game.state.memories.length,
+      3
+    );
 
-      const handler = () => {
+    game.hud.updateObjective(
+      'Find Memory 3.'
+    );
 
-        dialogueElement.removeEventListener(
-          'click',
-          handler
-        );
+    game.dialogue.hide();
 
-        continueAfterMemory.call(
-          this,
-          memoryNumber
-        );
-      };
+    saveGameState(
+      game.state
+    );
 
-
-      dialogueElement.addEventListener(
-        'click',
-        handler
-      );
-    }
+    return;
   }
-}
 
-
-/*
- * =========================
- * CONTINUE AFTER MEMORY
- * =========================
- */
-
-function continueAfterMemory(memoryNumber) {
 
   /*
-   * Memory 3 leads to ending.
+   * MEMORY 3
    */
+
   if (
     memoryNumber === 3
   ) {
 
-    showEnding.call(
-      this
+    /*
+     * Make absolutely sure the
+     * counter is 3/3.
+     */
+
+    game.hud.updateMemoryText(
+      3,
+      3
     );
 
-    return;
-  }
 
-
-  /*
-   * Return to gameplay.
-   */
-  this.scene = 'playing';
-
-
-  this.dialogue.hide();
-
-
-  this.currentInteraction = null;
-
-
-  updateObjective.call(
-    this
-  );
-
-
-  saveGameState(
-    this.state
-  );
-}
-
-
-/*
- * =========================
- * OBJECTIVE SYSTEM
- * =========================
- */
-
-function updateObjective() {
-
-  if (
-    this.state.ending
-  ) {
-
-    this.state.objective =
+    game.state.objective =
       'Remember.';
 
-    return;
-  }
 
-
-  if (
-    !this.state.progress ||
-    !this.state.progress.recorderFound
-  ) {
-
-    this.state.objective =
-      'Find the Memory Recorder.';
-
-    return;
-  }
-
-
-  switch (
-    this.state.progress.currentMemory
-  ) {
-
-    case 1:
-
-      this.state.objective =
-        'Find Memory 1.';
-
-      break;
-
-
-    case 2:
-
-      this.state.objective =
-        'Find Memory 2.';
-
-      break;
-
-
-    case 3:
-
-      this.state.objective =
-        'Find Memory 3.';
-
-      break;
-
-
-    case 4:
-
-      this.state.objective =
-        'Remember.';
-
-      break;
-
-
-    default:
-
-      this.state.objective =
-        'Find the Memory Recorder.';
-  }
-}
-
-
-/*
- * =========================
- * ENDING
- * =========================
- */
-
-function showEnding() {
-
-  this.state.ending =
-    'memories-recovered';
-
-
-  this.state.progress.currentMemory =
-    4;
-
-
-  this.state.objective =
-    'Remember.';
-
-
-  this.scene = 'ending';
-
-
-  this.dialogue.show(
-    'ALL MEMORIES RECOVERED',
-    'You came here looking for answers.\n\nBut some memories were never meant to be remembered.'
-  );
-
-
-  attachEndingHandlers.call(
-    this
-  );
-
-
-  saveGameState(
-    this.state
-  );
-}
-
-
-/*
- * =========================
- * ENDING BUTTONS
- * =========================
- */
-
-function attachEndingHandlers() {
-
-  const root =
-    this.root;
-
-
-  const buttons =
-    root.querySelectorAll(
-      'button'
+    game.hud.updateObjective(
+      'Remember.'
     );
 
 
-  for (
-    const button of buttons
-  ) {
+    game.dialogue.show(
+      'ALL MEMORIES RECOVERED',
 
-    const text =
-      button.textContent
-        .trim()
-        .toLowerCase();
-
-
-    if (
-      text === 'play again'
-    ) {
-
-      if (
-        button.dataset.remnantEndingBound ===
-        'true'
-      ) {
-
-        continue;
-      }
-
-
-      button.dataset.remnantEndingBound =
-        'true';
-
-
-      button.addEventListener(
-        'click',
-        () => {
-
-          resetGame.call(
-            this
-          );
-
-        },
-        {
-          once: true
-        }
-      );
-    }
-
-
-    if (
-      text === 'return'
-    ) {
-
-      if (
-        button.dataset.remnantEndingReturnBound ===
-        'true'
-      ) {
-
-        continue;
-      }
-
-
-      button.dataset.remnantEndingReturnBound =
-        'true';
-
-
-      button.addEventListener(
-        'click',
-        () => {
-
-          this.dialogue.hide();
-
-          this.scene = 'title';
-
-          this.titleScreen.show();
-
-        },
-        {
-          once: true
-        }
-      );
-    }
-  }
-}
-
-
-/*
- * =========================
- * RESET GAME
- * =========================
- */
-
-function resetGame() {
-
-  /*
-   * Create a completely fresh state.
-   */
-  this.state =
-    createInitialState();
-
-
-  /*
-   * Reset player.
-   */
-  this.player.x = 190;
-
-  this.player.y = 220;
-
-
-  /*
-   * Reset camera.
-   */
-  this.camera.x = 0;
-
-  this.camera.y = 0;
-
-
-  /*
-   * Reset interaction.
-   */
-  this.currentInteraction = null;
-
-  this.interactionPrompt = '';
-
-
-  /*
-   * Return to gameplay.
-   */
-  this.scene = 'playing';
-
-
-  this.dialogue.hide();
-
-  this.titleScreen.hide();
-
-  this.settingsPanel.hide();
-
-
-  /*
-   * Update HUD.
-   */
-  this.hud.updateMemoryText(
-    0,
-    3
-  );
-
-
-  this.hud.updateObjective(
-    'Find the Memory Recorder.'
-  );
-
-
-  this.hud.updatePrompt(
-    ''
-  );
-
-
-  /*
-   * Save clean state.
-   */
-  saveGameState(
-    this.state
-  );
-
-
-  /*
-   * Restart ambient audio.
-   */
-  this.audio.startAmbient();
-}
-
-
-/*
- * =========================
- * MEMORY ECHO DRAWING
- * =========================
- */
-
-function drawMemoryEcho(ctx) {
-
-  if (
-    !this.state.activeEcho ||
-    this.state.echoTimer <= 0
-  ) {
-
-    return;
-  }
-
-
-  const message =
-    this.state.echoMessage || '';
-
-
-  const alpha =
-    Math.min(
-      1,
-      this.state.echoTimer / 1.5
+      'You came here looking for answers.\n\nBut some memories were never meant to be remembered.'
     );
 
 
-  ctx.save();
+    game.scene = 'ending';
 
 
-  ctx.globalAlpha =
-    alpha;
-
-
-  /*
-   * Echo panel
-   */
-  ctx.fillStyle =
-    'rgba(10,18,28,0.88)';
-
-
-  ctx.fillRect(
-    280,
-    570,
-    720,
-    70
-  );
-
-
-  /*
-   * Border
-   */
-  ctx.strokeStyle =
-    'rgba(170,255,210,0.45)';
-
-  ctx.lineWidth = 1;
-
-
-  ctx.strokeRect(
-    280,
-    570,
-    720,
-    70
-  );
-
-
-  /*
-   * Title
-   */
-  ctx.fillStyle =
-    '#a8ffd0';
-
-
-  ctx.font =
-    'bold 14px sans-serif';
-
-
-  ctx.textAlign =
-    'center';
-
-
-  ctx.fillText(
-    'MEMORY ECHO',
-    640,
-    595
-  );
-
-
-  /*
-   * Message
-   */
-  ctx.fillStyle =
-    '#ffffff';
-
-
-  ctx.font =
-    '15px sans-serif';
-
-
-  /*
-   * Use a short version in the HUD so
-   * long memory text doesn't overflow.
-   */
-  const shortMessage =
-    message
-      .replace(/\n/g, ' ')
-      .substring(
-        0,
-        90
-      );
-
-
-  ctx.fillText(
-    shortMessage,
-    640,
-    620
-  );
-
-
-  ctx.restore();
+    saveGameState(
+      game.state
+    );
+  }
 }
 
 
 /*
- * =========================
+ * =========================================================
  * START GAME
- * =========================
+ * =========================================================
  */
 
 export function startGame(game) {
 
-  /*
-   * If a completed game is being started,
-   * begin a fresh run.
-   */
-  if (
-    game.state.ending
-  ) {
-
-    game.state =
-      createInitialState();
-  }
-
-
-  game.scene =
-    'playing';
+  game.scene = 'playing';
 
 
   game.titleScreen.hide();
 
   game.settingsPanel.hide();
 
-  game.dialogue.hide();
-
 
   game.audio.startAmbient();
 
 
-  /*
-   * Restore player position.
-   */
   game.player.x =
     game.state.player.x || 190;
 
@@ -1804,31 +1184,12 @@ export function startGame(game) {
     game.state.player.y || 220;
 
 
-  /*
-   * Make sure objective is correct.
-   */
-  updateObjective.call(
-    game
-  );
+  game.camera.x =
+    game.player.x -
+    game.canvas.width / 2;
 
 
-  game.hud.updateMemoryText(
-    game.state.memories.length,
-    3
-  );
-
-
-  game.hud.updateObjective(
-    game.state.objective
-  );
-
-
-  game.hud.updatePrompt(
-    ''
-  );
-
-
-  saveGameState(
-    game.state
-  );
+  game.camera.y =
+    game.player.y -
+    game.canvas.height / 2;
 }
