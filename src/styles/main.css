@@ -1,0 +1,201 @@
+:root {
+  --bg: #0a0d12;
+  --panel: rgba(19, 24, 31, 0.76);
+  --panel-border: rgba(255, 255, 255, 0.12);
+  --ink: #edf1ff;
+  --muted: rgba(223, 228, 255, 0.7);
+  --accent: #8ed9d4;
+  --shadow: rgba(0, 0, 0, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#gameRoot {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at top, rgba(24, 34, 40, 0.7), rgba(7, 8, 12, 1));
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #0e1419;
+}
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+}
+
+.hud-title {
+  position: absolute;
+  top: 24px;
+  left: 26px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.hud-memory {
+  position: absolute;
+  top: 24px;
+  right: 26px;
+  opacity: 0.8;
+}
+
+.hud-objective {
+  position: absolute;
+  left: 26px;
+  bottom: 24px;
+  max-width: 520px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.interaction-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 180ms ease;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+.interaction-prompt.visible {
+  opacity: 1;
+}
+
+.title-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(9, 12, 16, 0.38);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+
+.title-screen.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.title-content {
+  text-align: center;
+  padding: 2.5rem 3rem;
+  border: 1px solid var(--panel-border);
+  background: rgba(16, 18, 23, 0.55);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 22px 60px var(--shadow);
+}
+
+.title-content h1 {
+  margin: 0 0 0.8rem;
+  font-size: clamp(3.4rem, 6vw, 6rem);
+  letter-spacing: 0.2em;
+  font-weight: 500;
+}
+
+.title-content p {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+}
+
+.title-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+button {
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  background: rgba(255,255,255,0.04);
+  color: var(--ink);
+  padding: 0.9rem 1.5rem;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08);
+}
+
+.dialogue-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 40px));
+  padding: 1.1rem 1.35rem 1.2rem;
+  background: rgba(13, 17, 22, 0.72);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(10px);
+}
+
+.dialogue-panel.hidden {
+  display: none;
+}
+
+.dialogue-speaker {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.82;
+  margin-bottom: 0.5rem;
+}
+
+.dialogue-text {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.settings-panel {
+  position: absolute;
+  right: 26px;
+  top: 80px;
+  padding: 1.2rem;
+  background: rgba(11, 14, 17, 0.82);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(8px);
+}
+
+.settings-panel.hidden {
+  display: none;
+}
