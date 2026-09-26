@@ -1,3 +1,5 @@
+import { startGame } from '../core/game.js';
+
 export function createTitleScreen(root, game) {
   const panel = document.createElement('div');
   panel.className = 'title-screen';
@@ -21,7 +23,7 @@ export function createTitleScreen(root, game) {
     game.state.player = { x: 190, y: 220 };
     game.state.memories = [];
     game.state.objective = 'Find the Memory Recorder.';
-    game.start();
+    startGame(game);
   });
 
   const settingsButton = document.createElement('button');
