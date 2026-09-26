@@ -30,7 +30,11 @@ export function createInitialState() {
       'memory1': false,
       'memory2': false,
       'memory3': false
-    }
+    },
+    activeEcho: null,
+    echoMessage: "",
+    echoTimer: 0,
+    echoLocation: null
   };
 }
 
