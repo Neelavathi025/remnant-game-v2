@@ -24,7 +24,8 @@ export function createGame(root) {
     audio: null,
     camera: { x: 0, y: 0 },
     interactionPrompt: '',
-    currentInteraction: null
+    currentInteraction: null,
+    loop: null
   };
 
   bindInput();
@@ -43,116 +44,72 @@ export function createGame(root) {
   game.titleScreen = createTitleScreen(root, game);
   game.settingsPanel = createSettingsPanel(root, game);
 
-  game.syncUiFromState();
-  game.showTitle();
-  game.loop = game.loop.bind(game);
+  // Initialize UI state
+  game.hud.updateMemoryText(game.state.memories.length, 3);
+  game.hud.updateObjective(game.state.objective || 'Find the Memory Recorder.');
+
+  // Show title screen
+  game.scene = 'title';
+  game.titleScreen.show();
+  game.dialogue.hide();
+
+  // Bind loop
+  game.loop = gameLoop.bind(game);
 
   return game;
 }
 
-createGame.prototype.syncWorldToState = function () {
-  const location = getLocationData(this.state.currentLocation);
-  this.player.x = this.state.player.x || location.spawn.x;
-  this.player.y = this.state.player.y || location.spawn.y;
-  this.camera.x = this.player.x - this.canvas.width / 2;
-  this.camera.y = this.player.y - this.canvas.height / 2;
-};
+function gameLoop(time) {
+  const dt = Math.min((time - this.lastTime) / 1000 || 0.016, 0.033);
+  this.lastTime = time;
 
-createGame.prototype.syncUiFromState = function () {
-  this.hud.updateMemoryText(this.state.memories.length, 3);
-  this.hud.updateObjective(this.state.objective || 'Find the Memory Recorder.');
-};
+  // Update
+  if (this.scene === 'playing') {
+    const movement = getMovementVector();
+    this.player.update(dt, movement, this.world.getColliders(this.state.currentLocation));
 
-createGame.prototype.showTitle = function () {
-  this.scene = 'title';
-  this.titleScreen.show();
-  this.dialogue.hide();
-};
+    this.state.player.x = this.player.x;
+    this.state.player.y = this.player.y;
 
-createGame.prototype.start = function () {
-  this.scene = 'playing';
-  this.titleScreen.hide();
-  this.settingsPanel.hide();
-  this.audio.startAmbient();
-  this.syncWorldToState();
-};
+    this.camera.x = this.player.x - this.canvas.width / 2;
+    this.camera.y = this.player.y - this.canvas.height / 2;
 
-createGame.prototype.updateInteraction = function () {
-  const location = getLocationData(this.state.currentLocation);
-  const player = this.player;
-  let closest = null;
-  let closestDistance = Infinity;
+    // Update interactions
+    const location = getLocationData(this.state.currentLocation);
+    let closest = null;
+    let closestDistance = Infinity;
 
-  for (const object of location.interactables) {
-    const dx = player.x - object.x;
-    const dy = player.y - object.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance < object.radius + 26 && distance < closestDistance) {
-      closest = object;
-      closestDistance = distance;
+    for (const object of location.interactables) {
+      const dx = this.player.x - object.x;
+      const dy = this.player.y - object.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < object.radius + 26 && distance < closestDistance) {
+        closest = object;
+        closestDistance = distance;
+      }
     }
+
+    this.currentInteraction = closest;
+    this.interactionPrompt = closest ? '[E] INTERACT' : '';
+
+    // Handle input
+    if (consumePressed('e') && this.currentInteraction) {
+      triggerInteraction.call(this);
+    }
+
+    if (consumePressed('escape')) {
+      this.scene = 'title';
+      this.titleScreen.show();
+      this.dialogue.hide();
+    }
+
+    this.hud.updateMemoryText(this.state.memories.length, 3);
+    this.hud.updatePrompt(this.interactionPrompt);
+
+    saveGameState(this.state);
   }
 
-  this.currentInteraction = closest;
-  this.interactionPrompt = closest ? '[E] INTERACT' : '';
-};
-
-createGame.prototype.triggerInteraction = function () {
-  if (!this.currentInteraction) return;
-  const id = this.currentInteraction.id;
-  this.audio.playSfx('interaction');
-
-  if (id === 'memoryRecorder') {
-    this.dialogue.show('MEMORY RECORDER', 'The machine hums. Something inside is waiting.');
-    this.currentInteraction = null;
-    return;
-  }
-
-  if (id === 'bed') {
-    this.dialogue.show('MAYA', 'The sheets still smell like rain. You were here before.');
-    this.currentInteraction = null;
-    return;
-  }
-
-  if (id === 'window') {
-    this.dialogue.show('CITY', 'Rain marks the glass like a memory.');
-    this.currentInteraction = null;
-    return;
-  }
-
-  this.dialogue.show('SILENCE', 'Something feels unfinished here.');
-  this.currentInteraction = null;
-};
-
-createGame.prototype.update = function (dt) {
-  if (this.scene !== 'playing') return;
-
-  const movement = getMovementVector();
-  this.player.update(dt, movement, this.world.getColliders(this.state.currentLocation));
-
-  this.state.player.x = this.player.x;
-  this.state.player.y = this.player.y;
-
-  this.camera.x = this.player.x - this.canvas.width / 2;
-  this.camera.y = this.player.y - this.canvas.height / 2;
-
-  this.updateInteraction();
-
-  if (consumePressed('e') && this.currentInteraction) {
-    this.triggerInteraction();
-  }
-
-  if (consumePressed('escape')) {
-    this.showTitle();
-  }
-
-  this.hud.updateMemoryText(this.state.memories.length, 3);
-  this.hud.updatePrompt(this.interactionPrompt);
-
-  saveGameState(this.state);
-};
-
-createGame.prototype.draw = function () {
+  // Draw
   const ctx = this.ctx;
   const width = this.canvas.width;
   const height = this.canvas.height;
@@ -210,16 +167,43 @@ createGame.prototype.draw = function () {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(0, 0, width, height);
   }
-};
 
-createGame.prototype.loop = function (time) {
-  const dt = Math.min((time - this.lastTime) / 1000 || 0.016, 0.033);
-  this.lastTime = time;
-  this.update(dt);
-  this.draw();
   requestAnimationFrame(this.loop);
-};
+}
 
-createGame.prototype.startLoop = function () {
-  requestAnimationFrame(this.loop);
-};
+function triggerInteraction() {
+  if (!this.currentInteraction) return;
+
+  const id = this.currentInteraction.id;
+  this.audio.playSfx('interaction');
+
+  if (id === 'memoryRecorder') {
+    this.dialogue.show('MEMORY RECORDER', 'The machine hums. Something inside is waiting.');
+    this.currentInteraction = null;
+    return;
+  }
+
+  if (id === 'bed') {
+    this.dialogue.show('MAYA', 'The sheets still smell like rain. You were here before.');
+    this.currentInteraction = null;
+    return;
+  }
+
+  if (id === 'window') {
+    this.dialogue.show('CITY', 'Rain marks the glass like a memory.');
+    this.currentInteraction = null;
+    return;
+  }
+
+  this.dialogue.show('SILENCE', 'Something feels unfinished here.');
+  this.currentInteraction = null;
+}
+
+export function startGame(game) {
+  game.scene = 'playing';
+  game.titleScreen.hide();
+  game.settingsPanel.hide();
+  game.audio.startAmbient();
+  game.player.x = game.state.player.x || 190;
+  game.player.y = game.state.player.y || 220;
+}
