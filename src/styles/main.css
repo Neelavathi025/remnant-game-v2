@@ -65,6 +65,8 @@ canvas {
   top: 24px;
   right: 26px;
   opacity: 0.8;
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .hud-objective {
@@ -100,6 +102,7 @@ canvas {
   opacity: 0;
   pointer-events: none;
   transition: opacity 240ms ease;
+  backdrop-filter: blur(2px);
 }
 
 .title-screen.visible {
@@ -114,6 +117,7 @@ canvas {
   background: rgba(16, 18, 23, 0.55);
   backdrop-filter: blur(8px);
   box-shadow: 0 22px 60px var(--shadow);
+  max-width: 580px;
 }
 
 .title-content h1 {
@@ -123,11 +127,66 @@ canvas {
   font-weight: 500;
 }
 
-.title-content p {
-  margin: 0 0 1.5rem;
+.intro-lines {
+  margin-bottom: 2rem;
+  line-height: 1.8;
+}
+
+.intro-line {
+  margin: 0 0 0.6rem;
   color: var(--muted);
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+  animation: fadeInLine 600ms ease-out forwards;
+}
+
+.intro-line:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.intro-line:nth-child(2) {
+  animation-delay: 200ms;
+}
+
+.intro-line:nth-child(3) {
+  animation-delay: 400ms;
+}
+
+.intro-separator {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--panel-border), transparent);
+  margin: 1rem 0 1rem;
+  opacity: 0;
+  animation: fadeIn 600ms ease-out 600ms forwards;
+}
+
+.intro-line-main {
+  animation-delay: 800ms;
+  opacity: 0.9;
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+@keyframes fadeInLine {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 0.85;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .title-buttons {
@@ -147,13 +206,17 @@ button {
   letter-spacing: 0.12em;
   font-size: 0.7rem;
   cursor: pointer;
-  transition: transform 160ms ease, border-color 160ms ease;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
 button:hover {
   transform: translateY(-1px);
   border-color: rgba(255,255,255,0.25);
   background: rgba(255,255,255,0.08);
+}
+
+button:active {
+  transform: translateY(0);
 }
 
 .dialogue-panel {
@@ -178,12 +241,176 @@ button:hover {
   letter-spacing: 0.14em;
   opacity: 0.82;
   margin-bottom: 0.5rem;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .dialogue-text {
   font-size: 1rem;
   line-height: 1.7;
   color: var(--ink);
+}
+
+.memory-sequence {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(9, 12, 16, 0.75);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+  backdrop-filter: blur(4px);
+}
+
+.memory-sequence.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.memory-content {
+  text-align: center;
+  padding: 3rem 2.5rem;
+  border: 1px solid var(--panel-border);
+  background: rgba(16, 18, 23, 0.65);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 80px var(--shadow);
+  max-width: 600px;
+}
+
+.memory-header {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  margin: 0 0 1.5rem;
+  text-transform: uppercase;
+}
+
+.memory-text-container {
+  margin-bottom: 2rem;
+  line-height: 1.9;
+}
+
+.memory-line {
+  margin: 0 0 0.8rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+  animation: memoryFadeIn 400ms ease-out forwards;
+}
+
+.memory-line:nth-child(1) {
+  animation-delay: 200ms;
+}
+
+.memory-line:nth-child(2) {
+  animation-delay: 400ms;
+}
+
+.memory-line:nth-child(3) {
+  animation-delay: 600ms;
+}
+
+.memory-line:nth-child(4) {
+  animation-delay: 800ms;
+}
+
+@keyframes memoryFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 0.9;
+    transform: translateY(0);
+  }
+}
+
+.memory-continue {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  opacity: 0.7;
+  margin: 1rem 0 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ending-sequence {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(9, 12, 16, 0.85);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+  backdrop-filter: blur(4px);
+}
+
+.ending-sequence.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ending-content {
+  text-align: center;
+  padding: 3rem 2.5rem;
+  border: 1px solid var(--panel-border);
+  background: rgba(16, 18, 23, 0.70);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 24px 80px var(--shadow);
+  max-width: 600px;
+}
+
+.ending-header {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  margin: 0 0 2rem;
+  text-transform: uppercase;
+  animation: memoryFadeIn 400ms ease-out;
+}
+
+.ending-text-container {
+  margin-bottom: 2.5rem;
+  line-height: 2;
+}
+
+.ending-line {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+  animation: memoryFadeIn 400ms ease-out forwards;
+}
+
+.ending-line:nth-child(1) {
+  animation-delay: 200ms;
+}
+
+.ending-line:nth-child(2) {
+  animation-delay: 400ms;
+}
+
+.ending-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  animation: memoryFadeIn 400ms ease-out 600ms forwards;
+  opacity: 0;
 }
 
 .settings-panel {
@@ -198,4 +425,21 @@ button:hover {
 
 .settings-panel.hidden {
   display: none;
+}
+
+.memory-counter-animation {
+  animation: counterPulse 400ms ease-out;
+}
+
+@keyframes counterPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+    color: var(--accent);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
