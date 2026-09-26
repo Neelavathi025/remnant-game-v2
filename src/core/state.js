@@ -25,7 +25,12 @@ export function createInitialState() {
       y: 220
     },
     objective: 'Find the Memory Recorder.',
-    ending: null
+    ending: null,
+    memoryLocations: {
+      'memory1': false,
+      'memory2': false,
+      'memory3': false
+    }
   };
 }
 
